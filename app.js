@@ -1,5 +1,176 @@
-const BLOG_URL='https://gigmode.uprealband.com';const FEED=`${BLOG_URL}/feeds/posts/default?alt=json-in-script&max-results=50`;
-function loadFeed(url){return new Promise((resolve,reject)=>{const cb='gmFeed'+Date.now();const s=document.createElement('script');const t=setTimeout(()=>{delete window[cb];s.remove();reject(Error('Feed timeout'))},12000);window[cb]=d=>{clearTimeout(t);delete window[cb];s.remove();resolve(d)};s.onerror=()=>{clearTimeout(t);delete window[cb];s.remove();reject(Error('Feed error'))};s.src=url+'&callback='+cb;document.head.appendChild(s)})}
-const labels=e=>(e.category||[]).map(x=>x.term);const title=e=>e.title?.$t||'Untitled';const link=e=>e.link?.find(x=>x.rel==='alternate')?.href||'#';const plain=s=>{const n=document.createElement('div');n.innerHTML=s||'';return(n.textContent||'').replace(/\s+/g,' ').trim()};const date=e=>new Date(e.published?.$t||e.updated?.$t||Date.now()).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}).toUpperCase();
-function card(e,i,foundation){const a=document.createElement('article');a.className=foundation?'foundation-card':'post-card';if(foundation){a.innerHTML=`<div class="card-meta">FOUNDATION / CONCEPT <span class="card-number">${String(i+1).padStart(2,'0')}</span></div><h3></h3><span class="card-arrow">↗</span>`;a.querySelector('h3').textContent=title(e);a.tabIndex=0;a.onclick=()=>location.href=link(e);a.onkeydown=x=>{if(x.key==='Enter')location.href=link(e)}}else{a.innerHTML='<div class="post-label"></div><h3></h3><p></p><a>READ TRANSMISSION ↗</a>';a.querySelector('.post-label').textContent=(labels(e)[0]||'TRANSMISSION')+' / '+date(e);a.querySelector('h3').textContent=title(e);a.querySelector('p').textContent=plain(e.summary?.$t||e.content?.$t).slice(0,170);a.querySelector('a').href=link(e)}return a}
-async function init(){const f=document.querySelector('#foundationGrid'),l=document.querySelector('#latestPosts');try{const data=await loadFeed(FEED),entries=data.feed?.entry||[],concept=entries.filter(e=>labels(e).some(x=>x.toLowerCase()==='concept'));f.innerHTML='';l.innerHTML='';if(concept.length){concept.slice(0,14).forEach((e,i)=>f.append(card(e,i,true)));document.querySelector('#foundationStatus').textContent=concept.length+' FOUNDATION ARTICLES'}else f.innerHTML='<p class="loading">Belum ditemukan artikel berlabel CONCEPT.</p>';entries.slice(0,3).forEach((e,i)=>l.append(card(e,i,false)));if(!entries.length)l.innerHTML='<p class="loading">Belum ada artikel publik.</p>'}catch(e){f.innerHTML='<p class="loading">Feed Blogger belum dapat dimuat. Periksa akses publik dan konfigurasi feed.</p>';l.innerHTML=''}}document.querySelector('#menuToggle').addEventListener('click',()=>{const n=document.querySelector('#mainNav'),b=document.querySelector('#menuToggle');n.classList.toggle('open');b.setAttribute('aria-expanded',n.classList.contains('open'))});document.querySelectorAll('#mainNav a').forEach(a=>a.addEventListener('click',()=>document.querySelector('#mainNav').classList.remove('open')));init();
+const BLOG_URL = 'https://gigmode.uprealband.com';
+const FEED_URL = `${BLOG_URL}/feeds/posts/default?alt=json-in-script&max-results=50`;
+const CACHE_KEY = 'gigmode-blogger-feed-v1';
+const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+
+function loadFeed(url) {
+  return new Promise((resolve, reject) => {
+    const callbackName = 'gmFeed' + Date.now();
+    const script = document.createElement('script');
+    const timeout = setTimeout(() => {
+      delete window[callbackName];
+      script.remove();
+      reject(new Error('Feed timeout'));
+    }, 12000);
+
+    window[callbackName] = data => {
+      clearTimeout(timeout);
+      delete window[callbackName];
+      script.remove();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      clearTimeout(timeout);
+      delete window[callbackName];
+      script.remove();
+      reject(new Error('Feed request failed'));
+    };
+
+    script.src = url + '&callback=' + callbackName;
+    document.head.appendChild(script);
+  });
+}
+
+const labels = entry => (entry.category || []).map(item => item.term);
+const title = entry => entry.title?.$t || 'Untitled';
+const link = entry => entry.link?.find(item => item.rel === 'alternate')?.href || '#';
+
+function plain(html) {
+  const node = document.createElement('div');
+  node.innerHTML = html || '';
+  return (node.textContent || '').replace(/\\s+/g, ' ').trim();
+}
+
+function formatDate(entry) {
+  const value = entry.published?.$t || entry.updated?.$t;
+  if (!value) return '';
+  return new Date(value).toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).toUpperCase();
+}
+
+function card(entry, index, foundation) {
+  const article = document.createElement('article');
+  article.className = foundation ? 'foundation-card' : 'post-card';
+
+  if (foundation) {
+    article.innerHTML = `<div class="card-meta">FOUNDATION / CONCEPT <span class="card-number">${String(index + 1).padStart(2, '0')}</span></div><h3></h3><span class="card-arrow">↗</span>`;
+    article.querySelector('h3').textContent = title(entry);
+    article.tabIndex = 0;
+    article.setAttribute('role', 'link');
+    article.addEventListener('click', () => { window.location.href = link(entry); });
+    article.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        window.location.href = link(entry);
+      }
+    });
+  } else {
+    article.innerHTML = '<div class="post-label"></div><h3></h3><p></p><a>READ TRANSMISSION ↗</a>';
+    article.querySelector('.post-label').textContent =
+      (labels(entry)[0] || 'TRANSMISSION') + (formatDate(entry) ? ' / ' + formatDate(entry) : '');
+    article.querySelector('h3').textContent = title(entry);
+    article.querySelector('p').textContent =
+      plain(entry.summary?.$t || entry.content?.$t).slice(0, 170);
+    article.querySelector('a').href = link(entry);
+  }
+
+  return article;
+}
+
+function saveFeed(entries) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      entries
+    }));
+  } catch (error) {
+    console.warn('GIG MODE: unable to save feed cache', error);
+  }
+}
+
+function readFeedCache() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    if (!cached || !Array.isArray(cached.entries)) return null;
+    if (Date.now() - cached.savedAt > CACHE_MAX_AGE) return null;
+    return cached.entries;
+  } catch (error) {
+    return null;
+  }
+}
+
+function renderEntries(entries, options = {}) {
+  const foundationGrid = document.querySelector('#foundationGrid');
+  const latestPosts = document.querySelector('#latestPosts');
+  const status = document.querySelector('#foundationStatus');
+  const concepts = entries.filter(entry =>
+    labels(entry).some(label => label.toLowerCase() === 'concept')
+  );
+
+  foundationGrid.innerHTML = '';
+  latestPosts.innerHTML = '';
+
+  if (concepts.length) {
+    concepts.slice(0, 14).forEach((entry, index) => {
+      foundationGrid.append(card(entry, index, true));
+    });
+    status.textContent = concepts.length + ' FOUNDATION ARTICLES';
+  } else {
+    foundationGrid.innerHTML =
+      '<p class="loading">Belum ditemukan artikel berlabel CONCEPT.</p>';
+    status.textContent = 'FOUNDATION';
+  }
+
+  entries.slice(0, 3).forEach((entry, index) => {
+    latestPosts.append(card(entry, index, false));
+  });
+
+  if (!entries.length) {
+    latestPosts.innerHTML = '<p class="loading">Belum ada artikel publik.</p>';
+  }
+
+  if (options.cached) {
+    status.textContent += ' · MENAMPILKAN DATA TERSIMPAN';
+  }
+}
+
+async function init() {
+  try {
+    const data = await loadFeed(FEED_URL);
+    const entries = data.feed?.entry || [];
+    saveFeed(entries);
+    renderEntries(entries);
+  } catch (error) {
+    console.warn('GIG MODE: Blogger feed unavailable', error);
+    const cachedEntries = readFeedCache();
+
+    if (cachedEntries) {
+      renderEntries(cachedEntries, { cached: true });
+    } else {
+      document.querySelector('#foundationGrid').innerHTML =
+        '<p class="loading">Konten belum dapat dimuat. Silakan coba kembali beberapa saat lagi.</p>';
+      document.querySelector('#latestPosts').innerHTML =
+        '<p class="loading">Transmisi sementara tidak tersedia.</p>';
+      document.querySelector('#foundationStatus').textContent = 'FEED TEMPORARILY UNAVAILABLE';
+    }
+  }
+}
+
+document.querySelector('#menuToggle').addEventListener('click', () => {
+  const nav = document.querySelector('#mainNav');
+  const button = document.querySelector('#menuToggle');
+  nav.classList.toggle('open');
+  button.setAttribute('aria-expanded', nav.classList.contains('open'));
+});
+
+document.querySelectorAll('#mainNav a').forEach(anchor => {
+  anchor.addEventListener('click', () => {
+    document.querySelector('#mainNav').classList.remove('open');
+  });
+});
+
+init();
