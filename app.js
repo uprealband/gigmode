@@ -57,7 +57,7 @@ function card(entry, index, foundation) {
   article.className = foundation ? 'foundation-card' : 'post-card';
 
   if (foundation) {
-    article.innerHTML = `<div class="card-meta">FOUNDATION / CONCEPT <span class="card-number">${String(index + 1).padStart(2, '0')}</span></div><h3></h3><span class="card-arrow">↗</span>`;
+    article.innerHTML = `<div class="card-meta">FOUNDATION / UNIVERSE <span class="card-number">${String(index + 1).padStart(2, '0')}</span></div><h3></h3><span class="card-arrow">↗</span>`;
     article.querySelector('h3').textContent = title(entry);
     article.tabIndex = 0;
     article.setAttribute('role', 'link');
@@ -107,21 +107,20 @@ function renderEntries(entries, options = {}) {
   const foundationGrid = document.querySelector('#foundationGrid');
   const latestPosts = document.querySelector('#latestPosts');
   const status = document.querySelector('#foundationStatus');
-  const concepts = entries.filter(entry =>
-    labels(entry).some(label => label.toLowerCase() === 'concept')
-  );
+  // Foundation menampilkan seluruh artikel publik, tanpa membatasi satu label Blogger.
+  const foundationEntries = entries.slice(0, 14);
 
   foundationGrid.innerHTML = '';
   latestPosts.innerHTML = '';
 
-  if (concepts.length) {
-    concepts.slice(0, 14).forEach((entry, index) => {
+  if (foundationEntries.length) {
+    foundationEntries.forEach((entry, index) => {
       foundationGrid.append(card(entry, index, true));
     });
-    status.textContent = concepts.length + ' FOUNDATION ARTICLES';
+    status.textContent = foundationEntries.length + ' FOUNDATION ARTICLES';
   } else {
     foundationGrid.innerHTML =
-      '<p class="loading">Belum ditemukan artikel berlabel CONCEPT.</p>';
+      '<p class="loading">Belum ada artikel foundation.</p>';
     status.textContent = 'FOUNDATION';
   }
 
